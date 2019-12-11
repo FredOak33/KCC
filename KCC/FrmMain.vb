@@ -14,6 +14,7 @@ Public Class FrmMain
     Public _NewKey As DataTable
     Public _CurrentKey As DataTable
     Public _Team As DataTable
+    Public _Terminated As DataTable
 
     Public Property NewKey As DataTable
         Get
@@ -37,6 +38,15 @@ Public Class FrmMain
         End Get
         Set(value As DataTable)
             _Team = value
+        End Set
+    End Property
+
+    Public Property Terminated As DataTable
+        Get
+            Return _Terminated
+        End Get
+        Set(value As DataTable)
+            _Terminated = value
         End Set
     End Property
     'TEAM FILE
@@ -137,7 +147,7 @@ Public Class FrmMain
 
     Private Sub ConvertCSVToDataSet()
         Dim reader As StreamReader
-        reader = New StreamReader("H:\Fusion_Employee_Key_Contacts.csv")
+        reader = New StreamReader("S:\Corp\CIS\BCD-DR\FRED\Fusion_Employee_Key_Contacts.csv")
         Dim dtKey As DataTable = New DataTable
         Dim id As Integer = 1
         Dim firstLine As Boolean = True
@@ -146,7 +156,7 @@ Public Class FrmMain
         regex.IgnoreCase = True
         regex.Global = True
         Dim splitline2 As String()
-        Dim reader2 As StreamReader = New StreamReader(File.OpenRead("H:\Fusion_Employee_Key_Contacts.csv"))
+        Dim reader2 As StreamReader = New StreamReader(File.OpenRead("S:\Corp\CIS\BCD-DR\FRED\Fusion_Employee_Key_Contacts.csv"))
         Dim lineCount As Integer = 0
 
         While reader2.ReadLine() IsNot Nothing
@@ -154,11 +164,9 @@ Public Class FrmMain
             If lineCount Mod 1000 = 0 Then Console.WriteLine(lineCount)
         End While
 
-
         regex.Pattern = ",(?=([^" & Chr(34) & "]*" & Chr(34) & "[^" & Chr(34) & "]*" & Chr(34) & ")*(?![^" & Chr(34) & "]*" & Chr(34) & "))"
-        'regex.Pattern = (",(?=(?:[^""]*""[^""]*"")*(?![^""]*""))")
 
-        Using MyReader As New Microsoft.VisualBasic.FileIO.TextFieldParser("H:\Fusion_Employee_Key_Contacts.csv")
+        Using MyReader As New Microsoft.VisualBasic.FileIO.TextFieldParser("S:\Corp\CIS\BCD-DR\FRED\Fusion_Employee_Key_Contacts.csv")
             MyReader.HasFieldsEnclosedInQuotes = True
             Dim x As Integer = 0
             While id < lineCount
@@ -192,7 +200,6 @@ Public Class FrmMain
         End Using
 
         NewKey = dtKey.Copy()
-        'dgCC.DataSource = NewKey
 
         reader.Dispose()
         dtKey.Dispose()
@@ -309,22 +316,41 @@ Public Class FrmMain
         End If
 
         CompareDataTables(CurrentKey, NewKey)
+
+        CompareDataTeams(Team, Terminated)
+
     End Sub
 
     Private Sub CompareDataTables(ByVal CKey As DataTable, ByVal NKey As DataTable)
-        Dim ChangesDataTable As New DataTable
+        Dim TerminatedDataTable As New DataTable
+        Dim CostCenterDataTable As New DataTable
+        Dim LevelDataTable As New DataTable
 
-        With ChangesDataTable
+        With TerminatedDataTable
+            .Columns.Add("UID")
+            .Columns.Add("YID")
+            .Columns.Add("NAME")
+            .Columns.Add("STATUS")
+        End With
+
+        With CostCenterDataTable
             .Columns.Add("UID")
             .Columns.Add("YID")
             .Columns.Add("NAME")
             .Columns.Add("STATUS")
             .Columns.Add("CC")
             .Columns.Add("CC_Name")
+        End With
+
+        With LevelDataTable
+            .Columns.Add("UID")
+            .Columns.Add("YID")
+            .Columns.Add("NAME")
+            .Columns.Add("STATUS")
             .Columns.Add("Level1")
             .Columns.Add("Level1_Name")
-
         End With
+
         Dim rowArray As DataRow()
         Dim rowAdd As DataRow
 
@@ -335,41 +361,88 @@ Public Class FrmMain
             If rowArray.Length > 0 Then
                 'compare fields
                 'if changes
-                If Mid(row(6).ToString, 2, 10) = "Terminated" Then
-                    rowAdd = ChangesDataTable.NewRow
+                If row(6).ToString = "Terminated" Then
+                    rowAdd = TerminatedDataTable.NewRow
                     rowAdd("UID") = rowArray(0).Item(1).ToString
                     rowAdd("YID") = row(1).ToString
                     rowAdd("NAME") = row(5).ToString
                     rowAdd("STATUS") = row(6).ToString
-                    ChangesDataTable.Rows.Add(rowAdd)
+                    TerminatedDataTable.Rows.Add(rowAdd)
                 End If
 
-                If Mid(row(6).ToString, 2, 10) <> "Terminated" Then
+                dgTerm.DataSource = TerminatedDataTable
+                Terminated = TerminatedDataTable.Copy()
+
+                If row(6).ToString <> "Terminated" Then
                     If row(15).ToString <> rowArray(0).Item(5).ToString Then
-                        rowAdd = ChangesDataTable.NewRow
+                        rowAdd = CostCenterDataTable.NewRow
                         rowAdd("UID") = rowArray(0).Item(1).ToString
                         rowAdd("YID") = row(1).ToString
                         rowAdd("NAME") = row(5).ToString
                         rowAdd("STATUS") = row(6).ToString
                         rowAdd("CC") = row(15).ToString
                         rowAdd("CC_Name") = row(16).ToString
-                        ChangesDataTable.Rows.Add(rowAdd)
+                        CostCenterDataTable.Rows.Add(rowAdd)
                     End If
+                    dgCC.DataSource = CostCenterDataTable
 
-                    If Mid(row(36).ToString, 2, 6) <> rowArray(0).Item(6).ToString Then
-                        rowAdd = ChangesDataTable.NewRow
+                    If row(36).ToString <> rowArray(0).Item(6).ToString Then
+                        rowAdd = LevelDataTable.NewRow
                         rowAdd("UID") = rowArray(0).Item(1).ToString
                         rowAdd("YID") = row(1).ToString
                         rowAdd("NAME") = row(5).ToString
                         rowAdd("STATUS") = row(6).ToString
                         rowAdd("LEVEL1") = row(36).ToString
                         rowAdd("LEVEL1_Name") = row(35).ToString
-                        ChangesDataTable.Rows.Add(rowAdd)
+                        LevelDataTable.Rows.Add(rowAdd)
                     End If
+                    dgLevel.DataSource = LevelDataTable
                 End If
 
             End If
+
         Next
-        dgCC.DataSource = ChangesDataTable
+        LevelDataTable.Dispose()
+        CostCenterDataTable.Dispose()
+        TerminatedDataTable.Dispose()
+
+    End Sub
+
+    Private Sub CompareDataTeams(ByVal CTeam As DataTable, ByVal NKey As DataTable)
+        Dim TeamDataTable As New DataTable
+
+        With TeamDataTable
+            .Columns.Add("uID")
+            .Columns.Add("YID")
+            .Columns.Add("NAME")
+            .Columns.Add("STATUS")
+            .Columns.Add("TEAMNAME")
+        End With
+
+        Dim rowArray As DataRow()
+        Dim rowAdd As DataRow
+
+        'If dt1 is the original
+        For Each row In NKey.Rows
+            rowArray = CTeam.Select("uID ='" & row(0).ToString & "'")
+
+            If rowArray.Length > 0 Then
+                'compare fields
+                'if changes
+                If row(0).ToString = rowArray(0).Item(1).ToString Then
+                    rowAdd = TeamDataTable.NewRow
+                    rowAdd("UID") = rowArray(0).Item(1).ToString
+                    rowAdd("YID") = row(1).ToString
+                    rowAdd("NAME") = row(2).ToString
+                    rowAdd("STATUS") = row(3).ToString
+                    rowAdd("TEAMNAME") = rowArray(0).Item(2).ToString
+                    TeamDataTable.Rows.Add(rowAdd)
+                End If
+
+            End If
+
+        Next
+        dgTeam.DataSource = TeamDataTable
+
     End Sub
 End Class
